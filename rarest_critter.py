@@ -2,12 +2,14 @@ import requests
 import concurrent.futures
 
 user_id = "searching4critters"  # Replace with the actual user ID
+species_type = "Mollusca"  # Replace with the desired species type
 taxon_frequency = {}
 
 # Fetch species counts for the user
-species_counts_url = "https://api.inaturalist.org/v2/observations/species_counts"
+species_counts_url = "https://api.inaturalist.org/v1/observations/species_counts"
 params = {
     "user_id": user_id,
+    "iconic_taxa": species_type,
     "fields": "taxon.name,taxon.rank,taxon.observations_count",
     "per_page": 100,
     "page": 1,
@@ -44,22 +46,31 @@ def fetch_taxon_info(taxon_id):
             common_name = taxon_data["results"][0].get("preferred_common_name")
             scientific_name = taxon_data["results"][0].get("name", "Unknown")
             name_to_print = common_name if common_name else scientific_name
-            return taxon_id, name_to_print
-    return taxon_id, "Unknown"
+            return name_to_print
+    else:
+        print(f"Error fetching taxon info: {response.status_code} - {response.text}")
+        return None
 
 
-# Fetch taxon information for the top 5 rarest species in parallel
-taxon_info = []
+# Fetch and display the common or scientific names of the top 5 taxa
 with concurrent.futures.ThreadPoolExecutor() as executor:
-    futures = [
-        executor.submit(fetch_taxon_info, taxon_id) for taxon_id, _ in sorted_taxa
-    ]
-    for future in concurrent.futures.as_completed(futures):
-        taxon_info.append(future.result())
+    future_to_taxon = {
+        executor.submit(fetch_taxon_info, taxon_id): taxon_id
+        for taxon_id, _ in sorted_taxa
+    }
+    results = []
+    for future in concurrent.futures.as_completed(future_to_taxon):
+        taxon_id = future_to_taxon[future]
+        try:
+            taxon_name = future.result()
+            observations_count = taxon_frequency[taxon_id]
+            results.append((taxon_name, taxon_id, observations_count))
+        except Exception as exc:
+            print(f"Error fetching taxon name for Taxon ID {taxon_id}: {exc}")
 
-# Sort the taxon information based on the original sorted order
-taxon_info.sort(key=lambda x: sorted_taxa.index((x[0], taxon_frequency[x[0]])))
+# Sort the results by the number of observations
+results.sort(key=lambda x: x[2])
 
-# Print the taxon information in order
-for taxon_id, name in taxon_info:
-    print(f"{name} (Taxon ID: {taxon_id}): {taxon_frequency[taxon_id]} observations")
+# Display the sorted results
+for taxon_name, taxon_id, observations_count in results:
+    print(f"{taxon_name} (Taxon ID: {taxon_id}): {observations_count} observations")
