@@ -2,18 +2,23 @@ import requests
 import concurrent.futures
 
 user_id = "searching4critters"  # Replace with the actual user ID
-species_type = "Mollusca"  # Replace with the desired species type
+species_type = "Aves"  # Replace with the desired species type
+filter_by_species_type = (
+    False  # Set to True to filter by species type, False to search all species types
+)
 taxon_frequency = {}
 
 # Fetch species counts for the user
 species_counts_url = "https://api.inaturalist.org/v1/observations/species_counts"
 params = {
     "user_id": user_id,
-    "iconic_taxa": species_type,
     "fields": "taxon.name,taxon.rank,taxon.observations_count",
     "per_page": 100,
     "page": 1,
 }
+
+if filter_by_species_type:
+    params["iconic_taxa"] = species_type
 
 while True:
     response = requests.get(species_counts_url, params=params)
@@ -33,7 +38,7 @@ while True:
         break
 
 # Determine the top 5 taxa with the fewest total observations
-sorted_taxa = sorted(taxon_frequency.items(), key=lambda item: item[1])[:5]
+sorted_taxa = sorted(taxon_frequency.items(), key=lambda item: item[1])[:15]
 
 
 # Function to fetch taxon information and return common or scientific name
